@@ -1,0 +1,107 @@
+## Docker Compose конфигурация для Telegram-бота учета финансов
+## Включает: PostgreSQL, Redis, основное приложение бота
+
+services:
+  ## PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: finance_bot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-finance_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-finance_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # ports:
+    #   - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - finance_bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance_user} -d ${POSTGRES_DB:-finance_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ## Redis для кеширования и rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: finance_bot_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-change_me_in_production}
+    volumes:
+      - redis_data:/data
+    # ports:
+    #   - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - finance_bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ## Основное приложение Telegram-бота
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finance_bot_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Bot Configuration
+      BOT_TOKEN: ${BOT_TOKEN}
+
+      # AI Provider
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.groq.com/openai/v1}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-llama-3.3-70b-versatile}
+      AI_WHISPER_MODEL: ${AI_WHISPER_MODEL:-whisper-large-v3-turbo}
+      AI_PROXY: ${AI_PROXY:-}
+
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-finance_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-finance_bot}
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change_me_in_production}@redis:6379/0
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-logs/bot.log}
+      
+      # Application Settings
+      MAX_TRANSACTION_AMOUNT: ${MAX_TRANSACTION_AMOUNT:-10000000}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_PERIOD: ${RATE_LIMIT_PERIOD:-60}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - finance_bot_network
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+## Volumes для персистентности данных
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+## Сеть для взаимодействия сервисов
+networks:
+  finance_bot_network:
+    driver: bridge
+
+
