@@ -125,18 +125,14 @@ async def main() -> None:
     from bot.locales import t
 
     ru_commands = [
-        BotCommand(command="start", description=f"🚀 {t('cmd_start', 'ru')}"),
         BotCommand(command="menu", description=f"📋 {t('cmd_menu', 'ru')}"),
         BotCommand(command="add", description=f"➕ {t('cmd_add', 'ru')}"),
-        BotCommand(command="transactions", description=f"📝 {t('cmd_transactions', 'ru')}"),
         BotCommand(command="stats", description=f"📊 {t('cmd_stats', 'ru')}"),
         BotCommand(command="help", description=f"❓ {t('cmd_help', 'ru')}"),
     ]
     en_commands = [
-        BotCommand(command="start", description=f"🚀 {t('cmd_start', 'en')}"),
         BotCommand(command="menu", description=f"📋 {t('cmd_menu', 'en')}"),
         BotCommand(command="add", description=f"➕ {t('cmd_add', 'en')}"),
-        BotCommand(command="transactions", description=f"📝 {t('cmd_transactions', 'en')}"),
         BotCommand(command="stats", description=f"📊 {t('cmd_stats', 'en')}"),
         BotCommand(command="help", description=f"❓ {t('cmd_help', 'en')}"),
     ]
