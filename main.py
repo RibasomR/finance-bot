@@ -137,12 +137,9 @@ async def main() -> None:
         BotCommand(command="help", description=f"❓ {t('cmd_help', 'en')}"),
     ]
     for scope in (BotCommandScopeDefault(), BotCommandScopeAllPrivateChats()):
-        for lang in (None, "ru", "en"):
-            await bot.delete_my_commands(scope=scope, language_code=lang)
-
-    await bot.set_my_commands(ru_commands, scope=BotCommandScopeDefault(), language_code="ru")
-    await bot.set_my_commands(en_commands, scope=BotCommandScopeDefault(), language_code="en")
-    await bot.set_my_commands(ru_commands, scope=BotCommandScopeDefault())
+        await bot.set_my_commands(ru_commands, scope=scope, language_code="ru")
+        await bot.set_my_commands(en_commands, scope=scope, language_code="en")
+        await bot.set_my_commands(ru_commands, scope=scope)
     logger.info("✅ Меню команд установлено (ru/en)")
     
     dp = Dispatcher()
