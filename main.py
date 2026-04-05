@@ -9,7 +9,7 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats
 from loguru import logger
 
 from config import get_settings
@@ -136,9 +136,13 @@ async def main() -> None:
         BotCommand(command="stats", description=f"📊 {t('cmd_stats', 'en')}"),
         BotCommand(command="help", description=f"❓ {t('cmd_help', 'en')}"),
     ]
-    await bot.set_my_commands(ru_commands, language_code="ru")
-    await bot.set_my_commands(en_commands, language_code="en")
-    await bot.set_my_commands(ru_commands)  # default
+    for scope in (BotCommandScopeDefault(), BotCommandScopeAllPrivateChats()):
+        for lang in (None, "ru", "en"):
+            await bot.delete_my_commands(scope=scope, language_code=lang)
+
+    await bot.set_my_commands(ru_commands, scope=BotCommandScopeDefault(), language_code="ru")
+    await bot.set_my_commands(en_commands, scope=BotCommandScopeDefault(), language_code="en")
+    await bot.set_my_commands(ru_commands, scope=BotCommandScopeDefault())
     logger.info("✅ Меню команд установлено (ru/en)")
     
     dp = Dispatcher()
