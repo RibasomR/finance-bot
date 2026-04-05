@@ -1,140 +1,220 @@
 """
 Обработчики общих команд бота.
 
-Содержит handlers для команд /start и /help.
+Содержит handlers для команд /start и /help,
+включая выбор языка при первом запуске.
 """
 
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from loguru import logger
+from sqlalchemy import select
 
 from bot.keyboards.reply_keyboards import get_main_reply_keyboard, get_additional_menu_keyboard
 from bot.services.database import get_or_create_user
+from bot.models import get_session, User
+from bot.locales import t
 
 router = Router(name="common")
 
 
+## Клавиатура выбора языка
+def get_language_keyboard() -> InlineKeyboardMarkup:
+    """
+    Создать inline-клавиатуру для выбора языка.
+
+    :return: Inline-клавиатура с кнопками выбора языка
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton(text="\U0001f1f7\U0001f1fa Русский", callback_data="lang:ru"),
+            InlineKeyboardButton(text="\U0001f1ec\U0001f1e7 English", callback_data="lang:en"),
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 ## Обработчик команды /start
 @router.message(Command("start"))
-async def cmd_start(message: Message) -> None:
+async def cmd_start(message: Message, lang: str = "ru") -> None:
     """
     Обработчик команды /start.
-    
-    Отправляет приветственное сообщение новому пользователю с кратким описанием
-    возможностей бота и призывом к действию. Показывает постоянное меню.
-    
+
+    При первом запуске (пользователя нет в БД) показывает выбор языка.
+    При повторном /start сразу показывает главное меню.
+
     :param message: Объект сообщения от пользователя
+    :param lang: Язык пользователя из middleware
     :return: None
     """
-    user = message.from_user
-    logger.info(f"Пользователь {user.id} (@{user.username}) запустил бота")
-    
-    # Создаём пользователя в БД
-    await get_or_create_user(
-        telegram_id=user.id,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-    
+    user_tg = message.from_user
+    logger.info(f"Пользователь {user_tg.id} (@{user_tg.username}) запустил бота")
+
+    # Проверяем, существует ли пользователь в БД
+    async with get_session() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == user_tg.id)
+        )
+        existing_user = result.scalar_one_or_none()
+
+    if not existing_user:
+        # Первый запуск — показываем выбор языка
+        await message.answer(
+            "Please select your language:",
+            reply_markup=get_language_keyboard()
+        )
+        return
+
+    # Повторный /start — показываем главное меню
     welcome_text = (
-        f"👋 Привет, {user.first_name}!\n\n"
-        "Я помогу вести учет твоих доходов и расходов.\n\n"
-        "✨ <b>Что я умею:</b>\n"
-        "• 🎤 Записывать транзакции голосом\n"
-        "• ✍️ Добавлять операции вручную\n"
-        "• 📊 Показывать статистику и аналитику\n"
-        "• 📝 Вести историю всех операций\n"
-        "• 📤 Экспортировать данные в Excel\n\n"
-        "Используй меню ниже для быстрого доступа ко всем функциям 👇"
+        f"\U0001f44b {t('welcome', lang, name=user_tg.first_name)}"
     )
-    
+
     await message.answer(
-        welcome_text, 
+        welcome_text,
         parse_mode="HTML",
-        reply_markup=get_main_reply_keyboard()
+        reply_markup=get_main_reply_keyboard(lang)
     )
+
+
+## Обработчик выбора языка (первый запуск и смена языка)
+@router.callback_query(F.data.startswith("lang:"))
+async def process_language_selection(callback: CallbackQuery) -> None:
+    """
+    Обработка выбора языка.
+
+    При первом запуске — создаёт пользователя с выбранным языком.
+    При смене языка — обновляет поле в БД.
+
+    :param callback: Callback query от пользователя
+    :return: None
+    """
+    selected_lang = callback.data.split(":")[1]
+    user_tg = callback.from_user
+
+    # Проверяем, есть ли пользователь в БД
+    async with get_session() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == user_tg.id)
+        )
+        existing_user = result.scalar_one_or_none()
+
+    if not existing_user:
+        # Первый запуск — создаём пользователя с выбранным языком
+        user = await get_or_create_user(
+            telegram_id=user_tg.id,
+            username=user_tg.username,
+            first_name=user_tg.first_name,
+            last_name=user_tg.last_name,
+        )
+        # Устанавливаем язык
+        async with get_session() as session:
+            result = await session.execute(
+                select(User).where(User.telegram_id == user_tg.id)
+            )
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                db_user.language = selected_lang
+                await session.commit()
+
+        logger.info(f"Новый пользователь {user_tg.id} выбрал язык: {selected_lang}")
+
+        # Показываем приветствие на выбранном языке
+        welcome_text = (
+            f"\U0001f44b {t('welcome', selected_lang, name=user_tg.first_name)}"
+        )
+
+        await callback.message.edit_text(
+            welcome_text,
+            parse_mode="HTML"
+        )
+
+        await callback.message.answer(
+            f"\U0001f4cb <b>{t('main_menu_title', selected_lang)}</b>\n\n"
+            f"{t('main_menu_subtitle', selected_lang)}",
+            reply_markup=get_main_reply_keyboard(selected_lang)
+        )
+    else:
+        # Смена языка из настроек
+        async with get_session() as session:
+            result = await session.execute(
+                select(User).where(User.telegram_id == user_tg.id)
+            )
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                db_user.language = selected_lang
+                await session.commit()
+
+        logger.info(f"Пользователь {user_tg.id} сменил язык на: {selected_lang}")
+
+        await callback.message.edit_text(
+            f"\u2705 {t('language_changed', selected_lang)}"
+        )
+
+        # Обновляем reply-клавиатуру
+        await callback.message.answer(
+            f"\U0001f4cb <b>{t('main_menu_title', selected_lang)}</b>\n\n"
+            f"{t('main_menu_subtitle', selected_lang)}",
+            reply_markup=get_main_reply_keyboard(selected_lang)
+        )
+
+    await callback.answer()
 
 
 ## Обработчик команды /help
 @router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
+async def cmd_help(message: Message, lang: str = "ru") -> None:
     """
     Обработчик команды /help.
-    
-    Отправляет список всех доступных команд и функций бота
-    с кратким описанием каждой функции.
-    
+
     :param message: Объект сообщения от пользователя
+    :param lang: Язык пользователя из middleware
     :return: None
     """
     logger.info(f"Пользователь {message.from_user.id} запросил помощь")
-    
+
     help_text = (
-        "📚 <b>Справка по боту</b>\n\n"
-        
-        "📝 <b>Добавление транзакций:</b>\n"
-        "• 🎤 Отправь голосовое сообщение\n"
-        "  Пример: <i>\"Потратил 500 рублей на продукты\"</i>\n\n"
-        "• Кнопка <b>➕ Добавить</b> в меню\n"
-        "  Пошаговый ввод с выбором категорий\n\n"
-        
-        "📊 <b>Просмотр данных:</b>\n"
-        "• <b>💰 Доходы</b> — список всех доходов\n"
-        "• <b>💸 Расходы</b> — список всех расходов\n"
-        "• <b>📊 Статистика</b> — баланс и аналитика\n\n"
-        
-        "⚙️ <b>Дополнительно:</b>\n"
-        "Кнопка <b>📂 Ещё</b> открывает:\n"
-        "• 📝 Все транзакции\n"
-        "• 📅 Фильтр по периоду\n"
-        "• 🏷️ Управление категориями\n"
-        "• 📤 Экспорт в Excel\n"
-        "• ⚙️ Настройки\n\n"
-        
-        "✏️ <b>Редактирование:</b>\n"
-        "В списках доходов/расходов нажми на кнопку транзакции, "
-        "чтобы изменить сумму, категорию или удалить.\n\n"
-        
-        "💡 <b>Совет:</b> Используй меню внизу экрана для быстрого доступа!"
+        f"\U0001f4da <b>{t('help_title', lang)}</b>\n\n"
+        f"{t('help_text', lang)}"
     )
-    
+
     await message.answer(help_text, parse_mode="HTML")
 
 
-## Обработчик кнопки "📂 Ещё"
-@router.message(F.text == "📂 Ещё")
-async def handle_additional_menu(message: Message) -> None:
+## Обработчик кнопки "Ещё"
+@router.message(F.text.in_({"📂 Ещё", "📂 More"}))
+async def handle_additional_menu(message: Message, lang: str = "ru") -> None:
     """
     Показать дополнительное меню с второстепенными функциями.
-    
+
     :param message: Сообщение от пользователя
+    :param lang: Язык пользователя из middleware
     :return: None
     """
     logger.info(f"Пользователь {message.from_user.id} открыл дополнительное меню")
-    
+
     await message.answer(
-        "📂 <b>Дополнительные функции</b>\n\n"
-        "Выбери нужный раздел:",
-        reply_markup=get_additional_menu_keyboard()
+        f"\U0001f4c2 <b>{t('additional_menu_title', lang)}</b>\n\n"
+        f"{t('additional_menu_subtitle', lang)}",
+        reply_markup=get_additional_menu_keyboard(lang)
     )
 
 
-## Обработчик кнопки "◀️ Назад"
-@router.message(F.text == "◀️ Назад")
-async def handle_back_to_main(message: Message) -> None:
+## Обработчик кнопки "Назад"
+@router.message(F.text.in_({"◀️ Назад", "◀️ Back"}))
+async def handle_back_to_main(message: Message, lang: str = "ru") -> None:
     """
     Вернуться в главное меню.
-    
+
     :param message: Сообщение от пользователя
+    :param lang: Язык пользователя из middleware
     :return: None
     """
     logger.info(f"Пользователь {message.from_user.id} вернулся в главное меню")
-    
-    await message.answer(
-        "📋 <b>Главное меню</b>\n\n"
-        "Используй кнопки ниже для быстрого доступа 👇",
-        reply_markup=get_main_reply_keyboard()
-    )
 
+    await message.answer(
+        f"\U0001f4cb <b>{t('main_menu_title', lang)}</b>\n\n"
+        f"{t('main_menu_subtitle', lang)} \U0001f447",
+        reply_markup=get_main_reply_keyboard(lang)
+    )

@@ -1,7 +1,7 @@
 """
 Обработчики для настроек пользователя.
 
-Управляет настройками лимитов транзакций и других параметров профиля.
+Управляет настройками лимитов транзакций, смены языка и других параметров.
 """
 
 from aiogram import Router, F
@@ -20,129 +20,118 @@ from bot.keyboards.settings_keyboards import (
     get_cancel_settings_keyboard,
     get_remove_limit_keyboard
 )
+from bot.locales import t
 from sqlalchemy import select
 from config import get_settings
 
 router = Router(name="settings")
 
 
+def _settings_text(lang: str) -> str:
+    """Текст меню настроек."""
+    return (
+        f"\u2699\ufe0f <b>{t('settings_title', lang)}</b>\n\n"
+        f"{t('settings_subtitle', lang)}"
+    )
+
+
 ## Команда /settings
 @router.message(Command("settings"))
-async def cmd_settings(message: Message) -> None:
-    """
-    Открыть меню настроек (команда).
-    
-    :param message: Сообщение от пользователя
-    :return: None
-    """
-    user = message.from_user
-    logger.info(f"Пользователь {user.id} открыл настройки")
-    
-    text = (
-        "⚙️ <b>Настройки профиля</b>\n\n"
-        "Здесь ты можешь установить лимиты для контроля расходов.\n\n"
-        "💡 <b>Что это даёт?</b>\n"
-        "• Контроль за крупными тратами\n"
-        "• Предупреждения при превышении лимитов\n"
-        "• Более осознанный подход к финансам"
-    )
-    
+async def cmd_settings(message: Message, lang: str = "ru") -> None:
+    """Открыть меню настроек (команда)."""
+    logger.info(f"Пользователь {message.from_user.id} открыл настройки")
+
     await message.answer(
-        text,
-        reply_markup=get_settings_menu_keyboard(),
+        _settings_text(lang),
+        reply_markup=get_settings_menu_keyboard(lang),
         parse_mode="HTML"
     )
 
 
 ## Главное меню настроек
 @router.callback_query(F.data == "settings:menu")
-async def settings_menu(callback: CallbackQuery) -> None:
-    """
-    Показать главное меню настроек.
-    
-    :param callback: Callback query от пользователя
-    :return: None
-    """
-    user = callback.from_user
-    logger.info(f"Пользователь {user.id} открыл настройки")
-    
-    text = (
-        "⚙️ <b>Настройки профиля</b>\n\n"
-        "Здесь ты можешь установить лимиты для контроля расходов.\n\n"
-        "💡 <b>Что это даёт?</b>\n"
-        "• Контроль за крупными тратами\n"
-        "• Предупреждения при превышении лимитов\n"
-        "• Более осознанный подход к финансам"
-    )
-    
+async def settings_menu(callback: CallbackQuery, lang: str = "ru") -> None:
+    """Показать главное меню настроек."""
+    logger.info(f"Пользователь {callback.from_user.id} открыл настройки")
+
     await callback.message.edit_text(
-        text,
-        reply_markup=get_settings_menu_keyboard(),
+        _settings_text(lang),
+        reply_markup=get_settings_menu_keyboard(lang),
         parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+## Кнопка смены языка
+@router.callback_query(F.data == "settings:language")
+async def settings_language(callback: CallbackQuery, lang: str = "ru") -> None:
+    """Показать выбор языка."""
+    from bot.handlers.common import get_language_keyboard
+
+    await callback.message.edit_text(
+        t("select_language", lang),
+        reply_markup=get_language_keyboard()
     )
     await callback.answer()
 
 
 ## Просмотр текущих лимитов
 @router.callback_query(F.data == "settings:view_limits")
-async def view_limits(callback: CallbackQuery) -> None:
-    """
-    Показать текущие установленные лимиты пользователя.
-    
-    :param callback: Callback query от пользователя
-    :return: None
-    """
+async def view_limits(callback: CallbackQuery, lang: str = "ru") -> None:
+    """Показать текущие лимиты."""
     user_tg = callback.from_user
-    
+
     async with get_session() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == user_tg.id)
         )
         user = result.scalar_one_or_none()
-        
+
         if not user:
-            await callback.answer("❌ Ошибка получения данных", show_alert=True)
+            await callback.answer(f"\u274c {t('settings_error_save', lang)}", show_alert=True)
             return
-        
+
         settings = get_settings()
         global_limit = settings.max_transaction_amount
-        
-        text = "📋 <b>Твои лимиты</b>\n\n"
-        
-        text += "💰 <b>Лимит одной транзакции:</b>\n"
+
+        text = f"\U0001f4cb <b>{t('limits_title', lang)}</b>\n\n"
+
+        text += f"\U0001f4b0 <b>{t('limits_tx_label', lang)}</b>\n"
         if user.max_transaction_limit:
-            text += f"└ {user.max_transaction_limit:,}₽ (персональный)\n\n"
+            text += f"\u2514 {t('limits_tx_personal', lang, limit=f'{user.max_transaction_limit:,}')}\n\n"
         else:
-            text += f"└ {global_limit:,}₽ (по умолчанию)\n\n"
-        
-        text += "📊 <b>Месячный лимит трат:</b>\n"
+            text += f"\u2514 {t('limits_tx_default', lang, limit=f'{global_limit:,}')}\n\n"
+
+        text += f"\U0001f4ca <b>{t('limits_monthly_label', lang)}</b>\n"
         if user.monthly_limit:
-            text += f"└ {user.monthly_limit:,}₽\n\n"
-            
+            text += f"\u2514 {user.monthly_limit:,}\n\n"
+
             now = datetime.now(timezone.utc)
             start_month = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
             stats = await get_user_statistics(user.id, start_date=start_month)
-            
-            spent = float(stats['total_expense'])
+
+            spent = float(stats['total_expense']) if 'total_expense' in stats else sum(
+                float(v) for v in stats.get('expense_by_currency', {}).values()
+            )
             remaining = user.monthly_limit - spent
             percent = (spent / user.monthly_limit * 100) if user.monthly_limit > 0 else 0
-            
-            text += f"💸 <b>Потрачено в этом месяце:</b>\n"
-            text += f"└ {spent:,.0f}₽ из {user.monthly_limit:,}₽ ({percent:.1f}%)\n"
-            text += f"└ Осталось: {remaining:,.0f}₽\n\n"
-            
+
+            text += f"\U0001f4b8 <b>{t('limits_spent_label', lang)}</b>\n"
+            text += f"\u2514 {t('limits_spent_detail', lang, spent=f'{spent:,.0f}', limit=f'{user.monthly_limit:,}', percent=percent)}\n"
+            text += f"\u2514 {t('limits_remaining', lang, remaining=f'{remaining:,.0f}')}\n\n"
+
             if percent >= 100:
-                text += "⚠️ <b>Лимит превышен!</b>\n\n"
+                text += f"\u26a0\ufe0f <b>{t('limits_exceeded', lang)}</b>\n\n"
             elif percent >= 80:
-                text += "⚠️ <b>Внимание!</b> Скоро достигнешь лимита.\n\n"
+                text += f"\u26a0\ufe0f <b>{t('limits_approaching', lang)}</b>\n\n"
         else:
-            text += "└ Не установлен\n\n"
-        
-        text += "💡 Нажми на соответствующую кнопку, чтобы изменить лимиты."
-    
+            text += f"\u2514 {t('limits_monthly_not_set', lang)}\n\n"
+
+        text += f"\U0001f4a1 {t('limits_hint', lang)}"
+
     await callback.message.edit_text(
         text,
-        reply_markup=get_settings_menu_keyboard(),
+        reply_markup=get_settings_menu_keyboard(lang),
         parse_mode="HTML"
     )
     await callback.answer()
@@ -150,26 +139,18 @@ async def view_limits(callback: CallbackQuery) -> None:
 
 ## Установка лимита транзакции
 @router.callback_query(F.data == "settings:transaction_limit")
-async def set_transaction_limit(callback: CallbackQuery, state: FSMContext) -> None:
-    """
-    Начать процесс установки лимита одной транзакции.
-    
-    :param callback: Callback query от пользователя
-    :param state: FSM контекст
-    :return: None
-    """
+async def set_transaction_limit(callback: CallbackQuery, state: FSMContext, lang: str = "ru") -> None:
+    """Начать процесс установки лимита транзакции."""
     logger.info(f"Пользователь {callback.from_user.id} настраивает лимит транзакции")
-    
+
     text = (
-        "💰 <b>Лимит одной транзакции</b>\n\n"
-        "Введи максимальную сумму для одной транзакции в рублях.\n\n"
-        "При попытке добавить транзакцию больше этой суммы ты получишь предупреждение.\n\n"
-        "💡 <i>Например: 50000</i>"
+        f"\U0001f4b0 <b>{t('settings_tx_limit_title', lang)}</b>\n\n"
+        f"{t('settings_tx_limit_prompt', lang)}"
     )
-    
+
     await callback.message.edit_text(
         text,
-        reply_markup=get_cancel_settings_keyboard(),
+        reply_markup=get_cancel_settings_keyboard(lang),
         parse_mode="HTML"
     )
     await state.set_state(SettingsStates.waiting_for_transaction_limit)
@@ -178,88 +159,68 @@ async def set_transaction_limit(callback: CallbackQuery, state: FSMContext) -> N
 
 ## Обработка ввода лимита транзакции
 @router.message(SettingsStates.waiting_for_transaction_limit)
-async def process_transaction_limit(message: Message, state: FSMContext) -> None:
-    """
-    Обработать введенный лимит транзакции.
-    
-    :param message: Сообщение от пользователя
-    :param state: FSM контекст
-    :return: None
-    """
+async def process_transaction_limit(message: Message, state: FSMContext, lang: str = "ru") -> None:
+    """Обработать введенный лимит транзакции."""
     user_tg = message.from_user
-    
+
     try:
         limit = int(message.text.replace(" ", "").replace(",", ""))
-        
+
         if limit <= 0:
-            await message.answer(
-                "❌ Лимит должен быть положительным числом. Попробуй еще раз."
-            )
+            await message.answer(f"\u274c {t('settings_limit_positive', lang)}")
             return
-        
+
         if limit > 1000000000:
-            await message.answer(
-                "❌ Слишком большое значение. Попробуй еще раз."
-            )
+            await message.answer(f"\u274c {t('settings_limit_too_big', lang)}")
             return
-        
+
         async with get_session() as session:
             result = await session.execute(
                 select(User).where(User.telegram_id == user_tg.id)
             )
             user = result.scalar_one_or_none()
-            
+
             if user:
                 user.max_transaction_limit = limit
                 await session.commit()
-                
-                logger.info(f"✅ Пользователь {user_tg.id} установил лимит транзакции: {limit}₽")
-                
+
+                logger.info(f"Пользователь {user_tg.id} установил лимит транзакции: {limit}")
+
                 text = (
-                    f"✅ <b>Лимит установлен!</b>\n\n"
-                    f"Максимальная сумма транзакции: {limit:,}₽\n\n"
-                    f"Теперь при попытке добавить транзакцию больше этой суммы ты получишь предупреждение."
+                    f"\u2705 <b>{t('settings_tx_limit_set', lang)}</b>\n\n"
+                    f"{t('settings_tx_limit_set_detail', lang, limit=f'{limit:,}')}"
                 )
-                
+
                 await message.answer(
                     text,
-                    reply_markup=get_settings_menu_keyboard(),
+                    reply_markup=get_settings_menu_keyboard(lang),
                     parse_mode="HTML"
                 )
             else:
-                await message.answer("❌ Ошибка сохранения настроек")
-        
+                await message.answer(f"\u274c {t('settings_error_save', lang)}")
+
         await state.clear()
-        
+
     except ValueError:
         await message.answer(
-            "❌ Некорректное значение. Введи число в рублях.\n\n"
-            "💡 Например: 50000"
+            f"\u274c {t('settings_limit_invalid', lang, example='50000')}"
         )
 
 
 ## Установка месячного лимита
 @router.callback_query(F.data == "settings:monthly_limit")
-async def set_monthly_limit(callback: CallbackQuery, state: FSMContext) -> None:
-    """
-    Начать процесс установки месячного лимита трат.
-    
-    :param callback: Callback query от пользователя
-    :param state: FSM контекст
-    :return: None
-    """
+async def set_monthly_limit(callback: CallbackQuery, state: FSMContext, lang: str = "ru") -> None:
+    """Начать процесс установки месячного лимита."""
     logger.info(f"Пользователь {callback.from_user.id} настраивает месячный лимит")
-    
+
     text = (
-        "📊 <b>Месячный лимит трат</b>\n\n"
-        "Введи максимальную сумму расходов на месяц в рублях.\n\n"
-        "Бот будет отслеживать твои траты и предупреждать при приближении к лимиту.\n\n"
-        "💡 <i>Например: 100000</i>"
+        f"\U0001f4ca <b>{t('settings_monthly_title', lang)}</b>\n\n"
+        f"{t('settings_monthly_prompt', lang)}"
     )
-    
+
     await callback.message.edit_text(
         text,
-        reply_markup=get_cancel_settings_keyboard(),
+        reply_markup=get_cancel_settings_keyboard(lang),
         parse_mode="HTML"
     )
     await state.set_state(SettingsStates.waiting_for_monthly_limit)
@@ -268,190 +229,145 @@ async def set_monthly_limit(callback: CallbackQuery, state: FSMContext) -> None:
 
 ## Обработка ввода месячного лимита
 @router.message(SettingsStates.waiting_for_monthly_limit)
-async def process_monthly_limit(message: Message, state: FSMContext) -> None:
-    """
-    Обработать введенный месячный лимит.
-    
-    :param message: Сообщение от пользователя
-    :param state: FSM контекст
-    :return: None
-    """
+async def process_monthly_limit(message: Message, state: FSMContext, lang: str = "ru") -> None:
+    """Обработать введенный месячный лимит."""
     user_tg = message.from_user
-    
+
     try:
         limit = int(message.text.replace(" ", "").replace(",", ""))
-        
+
         if limit <= 0:
-            await message.answer(
-                "❌ Лимит должен быть положительным числом. Попробуй еще раз."
-            )
+            await message.answer(f"\u274c {t('settings_limit_positive', lang)}")
             return
-        
+
         if limit > 1000000000:
-            await message.answer(
-                "❌ Слишком большое значение. Попробуй еще раз."
-            )
+            await message.answer(f"\u274c {t('settings_limit_too_big', lang)}")
             return
-        
+
         async with get_session() as session:
             result = await session.execute(
                 select(User).where(User.telegram_id == user_tg.id)
             )
             user = result.scalar_one_or_none()
-            
+
             if user:
                 user.monthly_limit = limit
                 await session.commit()
-                
-                logger.info(f"✅ Пользователь {user_tg.id} установил месячный лимит: {limit}₽")
-                
+
+                logger.info(f"Пользователь {user_tg.id} установил месячный лимит: {limit}")
+
                 text = (
-                    f"✅ <b>Месячный лимит установлен!</b>\n\n"
-                    f"Максимальные траты в месяц: {limit:,}₽\n\n"
-                    f"Бот будет отслеживать твои расходы и уведомлять при достижении 80% и 100% лимита."
+                    f"\u2705 <b>{t('settings_monthly_set', lang)}</b>\n\n"
+                    f"{t('settings_monthly_set_detail', lang, limit=f'{limit:,}')}"
                 )
-                
+
                 await message.answer(
                     text,
-                    reply_markup=get_settings_menu_keyboard(),
+                    reply_markup=get_settings_menu_keyboard(lang),
                     parse_mode="HTML"
                 )
             else:
-                await message.answer("❌ Ошибка сохранения настроек")
-        
+                await message.answer(f"\u274c {t('settings_error_save', lang)}")
+
         await state.clear()
-        
+
     except ValueError:
         await message.answer(
-            "❌ Некорректное значение. Введи число в рублях.\n\n"
-            "💡 Например: 100000"
+            f"\u274c {t('settings_limit_invalid', lang, example='100000')}"
         )
 
 
 ## Удаление лимита транзакции
 @router.callback_query(F.data == "settings:remove_transaction_limit")
-async def remove_transaction_limit(callback: CallbackQuery) -> None:
-    """
-    Удалить персональный лимит транзакции.
-    
-    :param callback: Callback query от пользователя
-    :return: None
-    """
+async def remove_transaction_limit(callback: CallbackQuery, lang: str = "ru") -> None:
+    """Удалить персональный лимит транзакции."""
     user_tg = callback.from_user
-    
+
     async with get_session() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == user_tg.id)
         )
         user = result.scalar_one_or_none()
-        
+
         if user:
             user.max_transaction_limit = None
             await session.commit()
-            
-            logger.info(f"🗑 Пользователь {user_tg.id} удалил лимит транзакции")
-            
+
+            logger.info(f"Пользователь {user_tg.id} удалил лимит транзакции")
+
             settings = get_settings()
-            
+
             text = (
-                "✅ <b>Персональный лимит удален</b>\n\n"
-                f"Теперь используется лимит по умолчанию: {settings.max_transaction_amount:,}₽"
+                f"\u2705 <b>{t('settings_tx_limit_removed', lang)}</b>\n\n"
+                f"{t('settings_tx_limit_removed_detail', lang, limit=f'{settings.max_transaction_amount:,}')}"
             )
-            
+
             await callback.message.edit_text(
                 text,
-                reply_markup=get_settings_menu_keyboard(),
+                reply_markup=get_settings_menu_keyboard(lang),
                 parse_mode="HTML"
             )
         else:
-            await callback.answer("❌ Ошибка", show_alert=True)
-    
+            await callback.answer(f"\u274c", show_alert=True)
+
     await callback.answer()
 
 
 ## Удаление месячного лимита
 @router.callback_query(F.data == "settings:remove_monthly_limit")
-async def remove_monthly_limit(callback: CallbackQuery) -> None:
-    """
-    Удалить месячный лимит трат.
-    
-    :param callback: Callback query от пользователя
-    :return: None
-    """
+async def remove_monthly_limit(callback: CallbackQuery, lang: str = "ru") -> None:
+    """Удалить месячный лимит трат."""
     user_tg = callback.from_user
-    
+
     async with get_session() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == user_tg.id)
         )
         user = result.scalar_one_or_none()
-        
+
         if user:
             user.monthly_limit = None
             await session.commit()
-            
-            logger.info(f"🗑 Пользователь {user_tg.id} удалил месячный лимит")
-            
+
+            logger.info(f"Пользователь {user_tg.id} удалил месячный лимит")
+
             text = (
-                "✅ <b>Месячный лимит удален</b>\n\n"
-                "Теперь бот не будет отслеживать месячные траты."
+                f"\u2705 <b>{t('settings_monthly_removed', lang)}</b>\n\n"
+                f"{t('settings_monthly_removed_detail', lang)}"
             )
-            
+
             await callback.message.edit_text(
                 text,
-                reply_markup=get_settings_menu_keyboard(),
+                reply_markup=get_settings_menu_keyboard(lang),
                 parse_mode="HTML"
             )
         else:
-            await callback.answer("❌ Ошибка", show_alert=True)
-    
+            await callback.answer(f"\u274c", show_alert=True)
+
     await callback.answer()
 
 
 ## Отмена настройки
 @router.callback_query(F.data == "settings:cancel")
-async def cancel_settings(callback: CallbackQuery, state: FSMContext) -> None:
-    """
-    Отменить изменение настроек.
-    
-    :param callback: Callback query от пользователя
-    :param state: FSM контекст
-    :return: None
-    """
+async def cancel_settings(callback: CallbackQuery, state: FSMContext, lang: str = "ru") -> None:
+    """Отменить изменение настроек."""
     await state.clear()
-    
-    text = "❌ Действие отменено"
-    
+
     await callback.message.edit_text(
-        text,
-        reply_markup=get_settings_menu_keyboard()
+        f"\u274c {t('settings_cancel', lang)}",
+        reply_markup=get_settings_menu_keyboard(lang)
     )
     await callback.answer()
 
 
-## Обработчик Reply кнопки "⚙️ Настройки"
-@router.message(F.text == "⚙️ Настройки")
-async def handle_settings_button(message: Message) -> None:
-    """
-    Открыть меню настроек (Reply кнопка).
-    
-    :param message: Сообщение от пользователя
-    :return: None
-    """
-    user = message.from_user
-    logger.info(f"Пользователь {user.id} открыл настройки через Reply кнопку")
-    
-    text = (
-        "⚙️ <b>Настройки профиля</b>\n\n"
-        "Здесь ты можешь установить лимиты для контроля расходов.\n\n"
-        "💡 <b>Что это даёт?</b>\n"
-        "• Контроль за крупными тратами\n"
-        "• Предупреждения при превышении лимитов\n"
-        "• Более осознанный подход к финансам"
-    )
-    
+## Обработчик Reply кнопки "Настройки"
+@router.message(F.text.in_({"\u2699\ufe0f Настройки", "\u2699\ufe0f Settings"}))
+async def handle_settings_button(message: Message, lang: str = "ru") -> None:
+    """Открыть меню настроек (Reply кнопка)."""
+    logger.info(f"Пользователь {message.from_user.id} открыл настройки через Reply кнопку")
+
     await message.answer(
-        text,
-        reply_markup=get_settings_menu_keyboard(),
+        _settings_text(lang),
+        reply_markup=get_settings_menu_keyboard(lang),
         parse_mode="HTML"
     )

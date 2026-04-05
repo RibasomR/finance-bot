@@ -2,91 +2,66 @@
 Клавиатуры Reply для постоянного меню.
 
 Содержит функции для создания reply-клавиатур для постоянного доступа
-к основным функциям бота.
+к основным функциям бота. Поддержка мультиязычности через locales.
 """
 
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
+from bot.locales import t
 
-def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
+
+def get_main_reply_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """
     Создать постоянную Reply-клавиатуру с основными функциями.
-    
-    Клавиатура содержит кнопки для быстрого доступа к основным функциям:
-    - Доходы и Расходы (просмотр списков)
-    - Статистика
-    - Добавить транзакцию
-    - Дополнительное меню (категории, экспорт, настройки)
-    
+
+    :param lang: Код языка
     :return: Reply-клавиатура с основными кнопками
-    
-    Example:
-        >>> keyboard = get_main_reply_keyboard()
-        >>> await message.answer("Главное меню:", reply_markup=keyboard)
     """
     builder = ReplyKeyboardBuilder()
-    
-    # Первый ряд - доходы и расходы
+
     builder.row(
-        KeyboardButton(text="💰 Доходы"),
-        KeyboardButton(text="💸 Расходы")
+        KeyboardButton(text=f"\U0001f4b0 {t('btn_income', lang)}"),
+        KeyboardButton(text=f"\U0001f4b8 {t('btn_expense', lang)}")
     )
-    
-    # Второй ряд - статистика и добавить
+
     builder.row(
-        KeyboardButton(text="📊 Статистика"),
-        KeyboardButton(text="➕ Добавить")
+        KeyboardButton(text=f"\U0001f4ca {t('btn_stats', lang)}"),
+        KeyboardButton(text=f"\u2795 {t('btn_add', lang)}")
     )
-    
-    # Третий ряд - дополнительное меню
+
     builder.row(
-        KeyboardButton(text="📂 Ещё")
+        KeyboardButton(text=f"\U0001f4c2 {t('btn_more', lang)}")
     )
-    
+
     return builder.as_markup(resize_keyboard=True)
 
 
-def get_additional_menu_keyboard() -> ReplyKeyboardMarkup:
+def get_additional_menu_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """
     Создать Reply-клавиатуру с дополнительными функциями.
-    
-    Содержит второстепенные функции:
-    - Все транзакции
-    - За период
-    - Категории
-    - Экспорт
-    - Настройки
-    
+
+    :param lang: Код языка
     :return: Reply-клавиатура с дополнительными кнопками
-    
-    Example:
-        >>> keyboard = get_additional_menu_keyboard()
-        >>> await message.answer("Дополнительно:", reply_markup=keyboard)
     """
     builder = ReplyKeyboardBuilder()
-    
-    # Первый ряд - все транзакции и период
-    builder.row(
-        KeyboardButton(text="📝 Все транзакции"),
-        KeyboardButton(text="📅 За период")
-    )
-    
-    # Второй ряд - категории и экспорт
-    builder.row(
-        KeyboardButton(text="🏷️ Категории"),
-        KeyboardButton(text="📤 Экспорт")
-    )
-    
-    # Третий ряд - настройки
-    builder.row(
-        KeyboardButton(text="⚙️ Настройки")
-    )
-    
-    # Четвертый ряд - назад
-    builder.row(
-        KeyboardButton(text="◀️ Назад")
-    )
-    
-    return builder.as_markup(resize_keyboard=True)
 
+    builder.row(
+        KeyboardButton(text=f"\U0001f4dd {t('btn_all_transactions', lang)}"),
+        KeyboardButton(text=f"\U0001f4c5 {t('btn_by_period', lang)}")
+    )
+
+    builder.row(
+        KeyboardButton(text=f"\U0001f3f7\ufe0f {t('btn_categories', lang)}"),
+        KeyboardButton(text=f"\U0001f4e4 {t('btn_export', lang)}")
+    )
+
+    builder.row(
+        KeyboardButton(text=f"\u2699\ufe0f {t('btn_settings', lang)}")
+    )
+
+    builder.row(
+        KeyboardButton(text=f"\u25c0\ufe0f {t('btn_back', lang)}")
+    )
+
+    return builder.as_markup(resize_keyboard=True)

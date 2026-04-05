@@ -74,6 +74,14 @@ class User(Base, TimestampMixin):
         nullable=True,
         comment="Месячный лимит трат (в рублях)"
     )
+
+    language: Mapped[str] = mapped_column(
+        String(5),
+        nullable=False,
+        default="ru",
+        server_default="ru",
+        comment="Язык интерфейса пользователя (ru/en)"
+    )
     
     categories: Mapped[List["Category"]] = relationship(
         "Category",

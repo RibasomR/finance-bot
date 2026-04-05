@@ -21,6 +21,7 @@ from bot.services.database import initialize_default_categories
 from bot.middlewares import (
     RateLimitMiddleware,
     ErrorHandlerMiddleware,
+    LocaleMiddleware,
 )
 from bot.utils.validators import (
     initialize_rate_limiter,
@@ -120,24 +121,40 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
     
-    ## Устанавливаем меню команд бота
-    commands = [
-        BotCommand(command="start", description="🚀 Запустить бота"),
-        BotCommand(command="menu", description="📋 Главное меню"),
-        BotCommand(command="add", description="➕ Добавить транзакцию"),
-        BotCommand(command="transactions", description="📝 Все транзакции"),
-        BotCommand(command="stats", description="📊 Статистика"),
-        BotCommand(command="help", description="❓ Справка"),
+    ## Устанавливаем меню команд бота на двух языках
+    from bot.locales import t
+
+    ru_commands = [
+        BotCommand(command="start", description=f"🚀 {t('cmd_start', 'ru')}"),
+        BotCommand(command="menu", description=f"📋 {t('cmd_menu', 'ru')}"),
+        BotCommand(command="add", description=f"➕ {t('cmd_add', 'ru')}"),
+        BotCommand(command="transactions", description=f"📝 {t('cmd_transactions', 'ru')}"),
+        BotCommand(command="stats", description=f"📊 {t('cmd_stats', 'ru')}"),
+        BotCommand(command="help", description=f"❓ {t('cmd_help', 'ru')}"),
     ]
-    await bot.set_my_commands(commands)
-    logger.info("✅ Меню команд установлено")
+    en_commands = [
+        BotCommand(command="start", description=f"🚀 {t('cmd_start', 'en')}"),
+        BotCommand(command="menu", description=f"📋 {t('cmd_menu', 'en')}"),
+        BotCommand(command="add", description=f"➕ {t('cmd_add', 'en')}"),
+        BotCommand(command="transactions", description=f"📝 {t('cmd_transactions', 'en')}"),
+        BotCommand(command="stats", description=f"📊 {t('cmd_stats', 'en')}"),
+        BotCommand(command="help", description=f"❓ {t('cmd_help', 'en')}"),
+    ]
+    await bot.set_my_commands(ru_commands, language_code="ru")
+    await bot.set_my_commands(en_commands, language_code="en")
+    await bot.set_my_commands(ru_commands)  # default
+    logger.info("✅ Меню команд установлено (ru/en)")
     
     dp = Dispatcher()
     
     ## Регистрируем middlewares
     dp.message.middleware(RateLimitMiddleware(max_requests=20, time_window=60))
     dp.callback_query.middleware(RateLimitMiddleware(max_requests=20, time_window=60))
-    
+
+    dp.message.middleware(LocaleMiddleware())
+    dp.callback_query.middleware(LocaleMiddleware())
+    logger.info("✅ Locale middleware активирован")
+
     dp.message.middleware(ErrorHandlerMiddleware())
     dp.callback_query.middleware(ErrorHandlerMiddleware())
     logger.info("✅ Error handler активирован")

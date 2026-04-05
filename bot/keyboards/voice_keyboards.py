@@ -1,100 +1,96 @@
 """
 Клавиатуры для работы с голосовыми транзакциями.
 
-Functions:
-    get_voice_confirmation_keyboard: Клавиатура подтверждения голосовой транзакции
-    get_voice_edit_keyboard: Клавиатура выбора поля для редактирования
+Поддержка мультиязычности через locales.
 """
 
 from typing import List
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from bot.locales import t, translate_category_name
+
 
 ## Клавиатура подтверждения голосовой транзакции
-def get_voice_confirmation_keyboard() -> InlineKeyboardMarkup:
+def get_voice_confirmation_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """
-    Создает inline-клавиатуру для подтверждения голосовой транзакции.
-    
-    Returns:
-        InlineKeyboardMarkup: Клавиатура с кнопками подтверждения, отмены и редактирования
+    Создает клавиатуру для подтверждения голосовой транзакции.
+
+    :param lang: Код языка
+    :return: InlineKeyboardMarkup
     """
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✅ Подтвердить", callback_data="voice:confirm"),
-        InlineKeyboardButton(text="✏️ Редактировать", callback_data="voice:edit")
+        InlineKeyboardButton(text=f"\u2705 {t('confirm', lang)}", callback_data="voice:confirm"),
+        InlineKeyboardButton(text=f"\u270f\ufe0f {t('edit', lang)}", callback_data="voice:edit")
     )
     builder.row(
-        InlineKeyboardButton(text="❌ Отменить", callback_data="voice:cancel")
+        InlineKeyboardButton(text=f"\u274c {t('cancel', lang)}", callback_data="voice:cancel")
     )
     return builder.as_markup()
 
 
 ## Клавиатура выбора поля для редактирования
-def get_voice_edit_keyboard() -> InlineKeyboardMarkup:
+def get_voice_edit_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """
-    Создает inline-клавиатуру для выбора поля голосовой транзакции для редактирования.
-    
-    Returns:
-        InlineKeyboardMarkup: Клавиатура с кнопками выбора полей
+    Создает клавиатуру для выбора поля для редактирования.
+
+    :param lang: Код языка
+    :return: InlineKeyboardMarkup
     """
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="💵 Сумма", callback_data="voice_edit:amount"),
-        InlineKeyboardButton(text="🏷 Категория", callback_data="voice_edit:category")
+        InlineKeyboardButton(text=f"\U0001f4b5 {t('btn_amount', lang)}", callback_data="voice_edit:amount"),
+        InlineKeyboardButton(text=f"\U0001f3f7 {t('btn_category', lang)}", callback_data="voice_edit:category")
     )
     builder.row(
-        InlineKeyboardButton(text="📝 Описание", callback_data="voice_edit:description")
+        InlineKeyboardButton(text=f"\U0001f4dd {t('btn_description', lang)}", callback_data="voice_edit:description")
     )
     builder.row(
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="voice:back_to_confirm")
+        InlineKeyboardButton(text=f"\u2b05\ufe0f {t('back', lang)}", callback_data="voice:back_to_confirm")
     )
     return builder.as_markup()
 
 
 ## Клавиатура с категориями для голосовой транзакции
-def get_voice_categories_keyboard(categories: List[tuple], transaction_type: str) -> InlineKeyboardMarkup:
+def get_voice_categories_keyboard(categories: List[tuple], transaction_type: str, lang: str = "ru") -> InlineKeyboardMarkup:
     """
-    Создает inline-клавиатуру для выбора категории при редактировании голосовой транзакции.
-    
-    Args:
-        categories: Список кортежей (id, name, emoji) категорий
-        transaction_type: Тип транзакции ('income' или 'expense')
-    
-    Returns:
-        InlineKeyboardMarkup: Клавиатура с категориями
+    Создает клавиатуру для выбора категории при редактировании голосовой транзакции.
+
+    :param categories: Список кортежей (id, name, emoji)
+    :param transaction_type: Тип транзакции
+    :param lang: Код языка
+    :return: InlineKeyboardMarkup
     """
     builder = InlineKeyboardBuilder()
-    
+
     for category_id, name, emoji in categories:
-        button_text = f"{emoji} {name}"
+        display_name = translate_category_name(name, lang)
+        button_text = f"{emoji} {display_name}"
         builder.button(
             text=button_text,
             callback_data=f"voice_cat:{category_id}"
         )
-    
-    # 2 кнопки в ряд для компактности
+
     builder.adjust(2)
-    
-    # Кнопка "Назад"
+
     builder.row(
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="voice:back_to_edit_menu")
+        InlineKeyboardButton(text=f"\u2b05\ufe0f {t('back', lang)}", callback_data="voice:back_to_edit_menu")
     )
-    
+
     return builder.as_markup()
 
 
 ## Клавиатура отмены при редактировании
-def get_voice_edit_cancel_keyboard() -> InlineKeyboardMarkup:
+def get_voice_edit_cancel_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """
-    Создает inline-клавиатуру с кнопкой отмены редактирования.
-    
-    Returns:
-        InlineKeyboardMarkup: Клавиатура с кнопкой отмены
+    Создает клавиатуру с кнопкой возврата.
+
+    :param lang: Код языка
+    :return: InlineKeyboardMarkup
     """
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="voice:back_to_edit_menu")
+        InlineKeyboardButton(text=f"\u2b05\ufe0f {t('back', lang)}", callback_data="voice:back_to_edit_menu")
     )
     return builder.as_markup()
-
