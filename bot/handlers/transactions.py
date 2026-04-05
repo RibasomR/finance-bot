@@ -295,9 +295,10 @@ async def process_amount_input(message: Message, state: FSMContext, lang: str = 
 
     type_emoji = "\U0001f4b8" if category_type == CategoryType.EXPENSE else "\U0001f4b0"
     type_text = t("tx_category_of_expense", lang) if category_type == CategoryType.EXPENSE else t("tx_category_of_income", lang)
+    ruble = "\u20bd"
 
     await message.answer(
-        f"{type_emoji} <b>{t('tx_amount_set', lang, amount=f'{float(amount):.2f}', currency='\u20bd')}</b>\n\n"
+        f"{type_emoji} <b>{t('tx_amount_set', lang, amount=f'{float(amount):.2f}', currency=ruble)}</b>\n\n"
         f"{t('tx_choose_category', lang, type=type_text)}",
         reply_markup=get_categories_keyboard(categories_list, data["transaction_type"], lang)
     )
