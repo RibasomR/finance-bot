@@ -1,16 +1,16 @@
-<h1 align="center">💰 Finance Bot — Учёт финансов в Telegram</h1>
+<h1 align="center">💰 Finance Bot — Personal Finance Tracker for Telegram</h1>
 
 <p align="center">
-  <strong>Скажи боту, сколько потратил — он всё запишет.</strong><br>
-  Голосовой ввод, AI-парсинг, статистика. Любой OpenAI-совместимый провайдер.
+  <strong>Track expenses with voice messages. Just say it — the bot gets it.</strong><br>
+  AI parses your voice into structured transactions. Supports any OpenAI-compatible provider.
 </p>
 
 <p align="center">
-  <a href="#как-это-работает">Как это работает</a> •
-  <a href="#возможности">Возможности</a> •
-  <a href="#быстрый-старт">Быстрый старт</a> •
-  <a href="#настройка">Настройка</a> •
-  <a href="#лицензия">Лицензия</a>
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#license">License</a>
 </p>
 
 <p align="center">
@@ -23,52 +23,52 @@
 
 ---
 
-Каждый день ты тратишь деньги, но никогда толком не знаешь — куда. Открыть банковское приложение, листать историю, пытаться вручную раскидать по категориям — хватает максимум на неделю. **Finance Bot подходит к этому иначе**: ты просто говоришь.
+You spend money every day but never know where it goes. Opening a banking app, scrolling through transactions, trying to categorize them manually — nobody does that for more than a week. **Finance Bot takes a different approach**: you just talk.
 
-_«Потратил 500 на продукты»_ — отправь голосовое сообщение боту в Telegram. AI расшифрует речь, вытащит сумму, угадает категорию и сохранит транзакцию. Всё. В конце месяца спрашиваешь статистику — и видишь, куда ушли деньги. Без таблиц, без ручного ввода — просто разговор.
+_"Spent 500 on groceries"_ — send a voice message to the bot in Telegram. AI transcribes it, parses the amount, guesses the category, and saves the transaction. That's it. At the end of the month, you ask for stats and see where your money went. No spreadsheets, no manual input — just natural conversation.
 
-## Как это работает
+## How It Works
 
 ```
-🎤 Ты: [голосовое] «Получил три тысячи долларов за фриланс»
+🎤 You: [voice message] "Got paid 3000 dollars for freelance"
 
-🤖 Бот:
-   ✅ Транзакция сохранена!
-   💰 Тип: Доход
-   💵 Сумма: $3,000
-   🏷️ Категория: Фриланс
+🤖 Bot:
+   ✅ Transaction saved!
+   💰 Type: Income
+   💵 Amount: $3,000
+   🏷️ Category: Freelance
 
-📊 Ты: /stats
-🤖 Бот: Этот месяц — Доходы: $3,000 | Расходы: $1,240 | Баланс: +$1,760
+📊 You: /stats
+🤖 Bot: This month — Income: $3,000 | Expenses: $1,240 | Balance: +$1,760
 ```
 
-Отправь голосовое или напиши текстом — бот понимает и то, и другое. Сам определит тип (доход или расход), сумму, валюту и категорию.
+Send a voice message or type it out — the bot understands both. It figures out the type (income or expense), amount, currency, and category automatically.
 
-## Возможности
+## Features
 
-- **Голосовой ввод** — отправляешь войс, Whisper расшифровывает, LLM парсит транзакцию
-- **Текстовый ввод** — предпочитаешь печатать? Работает так же
-- **Умные категории** — AI сам назначает категорию, или выбираешь вручную
-- **Мультивалютность** — рубли и доллары из коробки
-- **Статистика** — разбивка по дням, неделям, месяцам с детализацией по категориям
-- **Экспорт в Excel** — скачивай транзакции в `.xlsx`
-- **Свои категории** — создавай, переименовывай, удаляй
-- **Rate limiting** — защита от спама на базе Redis
-- **Любой AI-провайдер** — Groq, OpenAI, Ollama или любой OpenAI-совместимый API
+- **Voice input** — send a voice message, Whisper transcribes it, LLM parses the transaction
+- **Text input** — prefer typing? Works the same way
+- **Smart categories** — AI assigns categories automatically, or you pick your own
+- **Multi-currency** — RUB and USD out of the box
+- **Statistics** — daily, weekly, monthly breakdowns with category splits
+- **Excel export** — download your transactions as `.xlsx`
+- **Custom categories** — create, rename, delete your own categories
+- **Rate limiting** — Redis-based protection against spam
+- **Any AI provider** — Groq, OpenAI, Ollama, or any OpenAI-compatible API
 
-## Быстрый старт
+## Quick Start
 
-### С Docker (рекомендуется)
+### With Docker (recommended)
 
 ```bash
 git clone https://github.com/RibasomR/finance-bot.git
 cd finance-bot
 cp .env.example .env
-nano .env  # Заполни BOT_TOKEN и AI_API_KEY
+nano .env  # Fill in BOT_TOKEN and AI_API_KEY
 docker compose up -d
 ```
 
-### Без Docker
+### Without Docker
 
 ```bash
 git clone https://github.com/RibasomR/finance-bot.git
@@ -76,42 +76,42 @@ cd finance-bot
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-nano .env  # Заполни BOT_TOKEN и AI_API_KEY
+nano .env  # Fill in BOT_TOKEN and AI_API_KEY
 python main.py
 ```
 
-> По умолчанию используется SQLite для разработки. Для прода переключи `DATABASE_URL` на PostgreSQL.
+> SQLite is used by default for development. Switch `DATABASE_URL` to PostgreSQL for production.
 
-## Команды
+## Commands
 
-| Команда | Описание |
-|---------|----------|
-| `/start` | Запуск бота |
-| `/menu` | Главное меню |
-| `/add` | Добавить транзакцию |
-| `/transactions` | Все транзакции |
-| `/stats` | Статистика |
-| `/help` | Справка |
+| Command | Description |
+|---------|-------------|
+| `/start` | Launch the bot |
+| `/menu` | Main menu |
+| `/add` | Add a transaction |
+| `/transactions` | View all transactions |
+| `/stats` | Statistics |
+| `/help` | Help |
 
-## Настройка
+## Configuration
 
-Все параметры в `.env`. Бот работает с **любым OpenAI-совместимым API** — просто укажи нужный URL.
+All settings are in `.env`. The bot uses **any OpenAI-compatible API** — just point it to the right URL.
 
-| Переменная | Обязательна | Описание |
-|------------|-------------|----------|
-| `BOT_TOKEN` | Да | Токен Telegram-бота от @BotFather |
-| `AI_BASE_URL` | Нет | Эндпоинт API (по умолчанию: Groq) |
-| `AI_API_KEY` | Да | API-ключ AI-провайдера |
-| `AI_CHAT_MODEL` | Нет | Модель для парсинга текста (по умолчанию: `llama-3.3-70b-versatile`) |
-| `AI_WHISPER_MODEL` | Нет | Модель для транскрипции (по умолчанию: `whisper-large-v3-turbo`) |
-| `AI_PROXY` | Нет | HTTP-прокси для запросов к AI API |
-| `DATABASE_URL` | Да | Строка подключения к БД |
-| `REDIS_URL` | Нет | Redis для rate limiting (без него — in-memory) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
+| `AI_BASE_URL` | No | API endpoint (default: Groq) |
+| `AI_API_KEY` | Yes | API key for your AI provider |
+| `AI_CHAT_MODEL` | No | Model for text parsing (default: `llama-3.3-70b-versatile`) |
+| `AI_WHISPER_MODEL` | No | Model for transcription (default: `whisper-large-v3-turbo`) |
+| `AI_PROXY` | No | HTTP proxy for AI API requests |
+| `DATABASE_URL` | Yes | Database connection string |
+| `REDIS_URL` | No | Redis for rate limiting (falls back to in-memory) |
 
-**Примеры провайдеров:**
+**Provider examples:**
 
 ```bash
-# Groq (есть бесплатный тариф)
+# Groq (free tier available)
 AI_BASE_URL=https://api.groq.com/openai/v1
 AI_API_KEY=gsk_...
 
@@ -121,41 +121,41 @@ AI_API_KEY=sk-...
 AI_CHAT_MODEL=gpt-4o-mini
 AI_WHISPER_MODEL=whisper-1
 
-# Ollama (локально)
+# Ollama (local)
 AI_BASE_URL=http://localhost:11434/v1
 AI_API_KEY=ollama
 AI_CHAT_MODEL=llama3
 ```
 
-## Структура проекта
+## Project Structure
 
 ```
 finance-bot/
 ├── bot/
-│   ├── handlers/       # Обработчики команд (голос, транзакции, статистика...)
-│   ├── keyboards/      # Inline и reply клавиатуры
-│   ├── models/         # SQLAlchemy модели (User, Transaction, Category)
-│   ├── services/       # Бизнес-логика (AI, база данных, экспорт)
-│   ├── middlewares/    # Rate limiting, обработка ошибок
-│   ├── states/         # FSM-состояния для многошаговых сценариев
-│   └── utils/          # Логирование, валидация, санитизация
-├── alembic/            # Миграции базы данных
-├── config/             # Конфигурация (Pydantic Settings)
+│   ├── handlers/       # Command handlers (voice, transactions, stats...)
+│   ├── keyboards/      # Inline & reply keyboards
+│   ├── models/         # SQLAlchemy models (User, Transaction, Category)
+│   ├── services/       # Business logic (AI, database, export)
+│   ├── middlewares/     # Rate limiting, error handling
+│   ├── states/         # FSM states for multi-step flows
+│   └── utils/          # Logging, validation, sanitization
+├── alembic/            # Database migrations
+├── config/             # Pydantic Settings configuration
 ├── docker-compose.yml  # PostgreSQL + Redis + Bot
 ├── Dockerfile
-├── main.py             # Точка входа
+├── main.py             # Entry point
 └── requirements.txt
 ```
 
-## Стек
+## Tech Stack
 
-- **aiogram 3.x** — асинхронный Telegram Bot фреймворк
-- **SQLAlchemy 2.0** + **Alembic** — async ORM + миграции
-- **Pydantic Settings** — управление конфигурацией
-- **httpx** — асинхронный HTTP-клиент для AI API
-- **Redis** — rate limiting (опционально, фолбэк на in-memory)
-- **Docker Compose** — деплой одной командой
+- **aiogram 3.x** — async Telegram Bot framework
+- **SQLAlchemy 2.0** + **Alembic** — async ORM + migrations
+- **Pydantic Settings** — configuration management
+- **httpx** — async HTTP client for AI API
+- **Redis** — rate limiting (optional, falls back to in-memory)
+- **Docker Compose** — one-command deployment
 
-## Лицензия
+## License
 
-[MIT](LICENSE) — делай что хочешь.
+[MIT](LICENSE) — do whatever you want.
