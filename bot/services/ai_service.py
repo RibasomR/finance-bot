@@ -19,6 +19,7 @@ from loguru import logger
 
 from config import get_settings
 from bot.utils.sanitizer import sanitize_url
+from bot.locales import t
 
 
 ## Default settings for parsing
@@ -69,7 +70,7 @@ def _get_httpx_client_kwargs() -> dict:
 
 
 ## Transcribe audio to text via Whisper-compatible API
-async def transcribe_audio(audio_path: str) -> str:
+async def transcribe_audio(audio_path: str, language: str = "ru") -> str:
     """
     Transcribe audio file to text via Whisper-compatible API.
 
@@ -136,7 +137,7 @@ async def transcribe_audio(audio_path: str) -> str:
                     },
                     data={
                         "model": model,
-                        "language": "ru",
+                        "language": language,
                         "response_format": "text"
                     },
                     timeout=30.0
@@ -220,7 +221,7 @@ def _calculate_backoff_delay(attempt: int, base_delay: float = 0.5, jitter_perce
 
 
 ## Parse transaction text via Chat Completions API
-async def parse_transaction_text(text: str) -> Optional[Dict[str, Any]]:
+async def parse_transaction_text(text: str, lang: str = "ru") -> Optional[Dict[str, Any]]:
     """
     Parse transaction text via OpenAI-compatible Chat Completions API.
 
@@ -266,29 +267,9 @@ async def parse_transaction_text(text: str) -> Optional[Dict[str, Any]]:
             "Set AI_API_KEY in .env file."
         )
 
-    ## Prompt for parsing transaction via LLM
-    prompt = """Проанализируй текст и извлеки информацию о финансовой транзакции.
-Верни JSON с полями:
-- type: "income" или "expense"
-- amount: число (только сумма, без валюты)
-- currency: "RUB" или "USD" (валюта транзакции)
-- category: строка (категория транзакции)
-- description: строка или null (дополнительное описание)
-
-Категории расходов: Продукты, Транспорт, Рестораны, Здоровье, Дом, Развлечения, Одежда, Другое
-Категории доходов: Зарплата, Фриланс, Подарок, Инвестиции, Другое
-
-Правила распознавания валюты:
-- "рублей", "руб", "₽", "р" → RUB
-- "долларов", "баксов", "долл", "$", "usd" → USD
-- Если валюта не указана → RUB (по умолчанию)
-
-Если чего-то нет - используй null.
-Если "тысяч" или "тыс" - умножь сумму на 1000.
-
-Текст: "{text}"
-
-Верни ТОЛЬКО JSON, без дополнительного текста.""".format(text=text)
+    ## Prompt for parsing transaction via LLM (from locale)
+    prompt_template = t("ai_prompt", lang)
+    prompt = prompt_template.format(text=text)
 
     base_url = settings.ai_base_url.rstrip("/")
     client_kwargs = _get_httpx_client_kwargs()
@@ -485,7 +466,8 @@ async def parse_transaction_text(text: str) -> Optional[Dict[str, Any]]:
 def find_matching_category(
     category_name: Optional[str],
     available_categories: list,
-    default_category_name: str = "Другое"
+    default_category_name: str = "",
+    lang: str = "ru"
 ) -> tuple[Optional[int], str]:
     """
     Find matching category by name from recognized text.
@@ -504,10 +486,21 @@ def find_matching_category(
         >>> print(category_id, name)
         1 "Produkty"
     """
+    from bot.locales import translate_category_name, CATEGORY_NAME_TO_KEY
+
+    ## Determine default category name from locale if not provided
+    if not default_category_name:
+        default_category_name = t("cat_other", lang)
+
     if not category_name:
         ## Find default category
         for cat in available_categories:
             if cat.name == default_category_name:
+                return cat.id, cat.name
+        ## Try matching by locale key (category may be stored in another language)
+        for cat in available_categories:
+            key = CATEGORY_NAME_TO_KEY.get(cat.name)
+            if key == "cat_other":
                 return cat.id, cat.name
         return None, default_category_name
 
@@ -518,14 +511,31 @@ def find_matching_category(
         if cat.name.lower() == category_name_lower:
             return cat.id, cat.name
 
+    ## Match by translated name (AI may return category in user's language)
+    for cat in available_categories:
+        translated = translate_category_name(cat.name, lang)
+        if translated.lower() == category_name_lower:
+            return cat.id, cat.name
+
     ## Partial match
     for cat in available_categories:
         if category_name_lower in cat.name.lower() or cat.name.lower() in category_name_lower:
             return cat.id, cat.name
 
+    ## Partial match on translated names
+    for cat in available_categories:
+        translated = translate_category_name(cat.name, lang).lower()
+        if category_name_lower in translated or translated in category_name_lower:
+            return cat.id, cat.name
+
     ## Not found - return default
     for cat in available_categories:
         if cat.name == default_category_name:
+            return cat.id, cat.name
+    ## Fallback: find "Other" by locale key
+    for cat in available_categories:
+        key = CATEGORY_NAME_TO_KEY.get(cat.name)
+        if key == "cat_other":
             return cat.id, cat.name
 
     return None, default_category_name

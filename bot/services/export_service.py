@@ -20,6 +20,7 @@ from bot.services.database import (
     get_user_statistics,
     get_or_create_user,
 )
+from bot.locales import t, translate_category_name
 
 
 ## Генерация Excel файла с транзакциями
@@ -27,6 +28,7 @@ async def generate_transactions_excel(
     user_id: int,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    lang: str = "ru",
 ) -> str:
     """
     Генерировать Excel файл с транзакциями пользователя.
@@ -65,17 +67,17 @@ async def generate_transactions_excel(
     # Создаем Excel файл
     wb = Workbook()
     ws = wb.active
-    ws.title = "Транзакции"
-    
+    ws.title = t("excel_sheet", lang)
+
     # Определяем период для заголовка
     if start_date and end_date:
-        period_text = f"с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}"
+        period_text = t("excel_period_from_to", lang, start=start_date.strftime('%d.%m.%Y'), end=end_date.strftime('%d.%m.%Y'))
     elif start_date:
-        period_text = f"с {start_date.strftime('%d.%m.%Y')}"
+        period_text = t("excel_period_from", lang, start=start_date.strftime('%d.%m.%Y'))
     elif end_date:
-        period_text = f"по {end_date.strftime('%d.%m.%Y')}"
+        period_text = t("excel_period_to", lang, end=end_date.strftime('%d.%m.%Y'))
     else:
-        period_text = "за всё время"
+        period_text = t("excel_period_all", lang)
     
     # Стили
     header_font = Font(bold=True, size=12, color="FFFFFF")
@@ -95,7 +97,7 @@ async def generate_transactions_excel(
     # Заголовок документа
     ws.merge_cells('A1:F1')
     title_cell = ws['A1']
-    title_cell.value = f"Отчет по транзакциям {period_text}"
+    title_cell.value = f"{t('excel_title', lang)} {period_text}"
     title_cell.font = Font(bold=True, size=14)
     title_cell.alignment = Alignment(horizontal="center")
     
@@ -105,28 +107,35 @@ async def generate_transactions_excel(
     balance = total_income - total_expense
 
     ws.merge_cells('A2:B2')
-    ws['A2'] = "Статистика"
+    ws['A2'] = t("excel_stats", lang)
     ws['A2'].font = Font(bold=True, size=12)
 
-    ws['A3'] = "Общий баланс:"
+    ws['A3'] = t("excel_balance", lang)
     ws['B3'] = float(balance)
-    ws['B3'].number_format = '#,##0.00 ₽'
+    ws['B3'].number_format = '#,##0.00'
 
-    ws['A4'] = "Доходы:"
+    ws['A4'] = t("excel_income", lang)
     ws['B4'] = float(total_income)
-    ws['B4'].number_format = '#,##0.00 ₽'
+    ws['B4'].number_format = '#,##0.00'
     ws['B4'].fill = income_fill
 
-    ws['A5'] = "Расходы:"
+    ws['A5'] = t("excel_expense", lang)
     ws['B5'] = float(total_expense)
-    ws['B5'].number_format = '#,##0.00 ₽'
+    ws['B5'].number_format = '#,##0.00'
     ws['B5'].fill = expense_fill
 
-    ws['A6'] = "Количество операций:"
+    ws['A6'] = t("excel_operations_count", lang)
     ws['B6'] = stats.get('income_count', 0) + stats.get('expense_count', 0)
     
     # Заголовок таблицы транзакций
-    headers = ['Дата', 'Время', 'Тип', 'Сумма (₽)', 'Категория', 'Описание']
+    headers = [
+        t("excel_header_date", lang),
+        t("excel_header_time", lang),
+        t("excel_header_type", lang),
+        t("excel_header_amount", lang),
+        t("excel_header_category", lang),
+        t("excel_header_description", lang),
+    ]
     header_row = 8
     
     for col_num, header in enumerate(headers, 1):
@@ -150,7 +159,7 @@ async def generate_transactions_excel(
         type_cell = ws.cell(
             row=current_row,
             column=3,
-            value="Доход" if transaction.type == TransactionType.INCOME else "Расход"
+            value=t("excel_type_income", lang) if transaction.type == TransactionType.INCOME else t("excel_type_expense", lang)
         )
         
         # Сумма
@@ -168,10 +177,11 @@ async def generate_transactions_excel(
             ws.cell(row=current_row, column=col).border = border
         
         # Категория
+        cat_display = translate_category_name(transaction.category.name, lang)
         ws.cell(
             row=current_row,
             column=5,
-            value=f"{transaction.category.emoji} {transaction.category.name}"
+            value=f"{transaction.category.emoji} {cat_display}"
         )
         
         # Описание

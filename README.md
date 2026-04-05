@@ -68,6 +68,11 @@ nano .env  # Fill in BOT_TOKEN and AI_API_KEY
 docker compose up -d
 ```
 
+> **Upgrading?** If you're updating from a previous version, run migrations:
+> ```bash
+> docker compose exec bot alembic upgrade head
+> ```
+
 ### Without Docker
 
 ```bash
@@ -77,6 +82,7 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 nano .env  # Fill in BOT_TOKEN and AI_API_KEY
+alembic upgrade head  # Run database migrations
 python main.py
 ```
 
