@@ -37,6 +37,16 @@ def get_main_menu_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+## Клавиатура под статистикой
+def get_stats_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    keyboard = [
+        [InlineKeyboardButton(text=f"\U0001f4c5 {t('menu_period', lang)}", callback_data="menu:period")],
+        [InlineKeyboardButton(text=f"\U0001f4e4 {t('menu_export', lang)}", callback_data="stats:export")],
+        [InlineKeyboardButton(text=f"\U0001f3f7\ufe0f {t('menu_categories', lang)}", callback_data="menu:categories")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 ## Клавиатура навигации по транзакциям
 def get_transactions_navigation_keyboard(
     page: int,

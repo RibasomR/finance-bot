@@ -56,8 +56,8 @@ async def cmd_export(message: Message, state: FSMContext, lang: str = "ru") -> N
     )
 
 
-## Callback для экспорта из меню настроек
-@router.callback_query(F.data == "menu:export")
+## Callback для экспорта из статистики и главного меню
+@router.callback_query(F.data.in_({"menu:export", "stats:export"}))
 async def show_export_menu(callback: CallbackQuery, state: FSMContext, lang: str = "ru") -> None:
     """
     Показать меню экспорта (callback из главного меню).

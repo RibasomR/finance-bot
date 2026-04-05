@@ -18,6 +18,7 @@ from loguru import logger
 from bot.states import ViewTransactionsStates, EditTransactionStates, AddTransactionStates
 from bot.keyboards.view_keyboards import (
     get_main_menu_keyboard,
+    get_stats_keyboard,
     get_transactions_navigation_keyboard,
     get_transaction_actions_keyboard,
     get_delete_confirmation_keyboard,
@@ -203,9 +204,9 @@ async def show_statistics(
             text += f"{i}. {cat['emoji']} {cat_display}: {float(cat['total']):.2f} {symbol}\n"
 
     if edit:
-        await message.edit_text(text, reply_markup=get_main_menu_keyboard(lang))
+        await message.edit_text(text, reply_markup=get_stats_keyboard(lang))
     else:
-        await message.answer(text, reply_markup=get_main_menu_keyboard(lang))
+        await message.answer(text, reply_markup=get_stats_keyboard(lang))
 
 
 ## Просмотр транзакций
